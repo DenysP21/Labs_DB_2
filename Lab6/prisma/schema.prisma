@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model author {
+  author_id  Int          @id @default(autoincrement())
+  name       String       @db.VarChar(32)
+  surname    String       @db.VarChar(32)
+  birth_year Int?         @db.SmallInt
+  // 6. Видалено стовпець country
+  authorbook authorbook[]
+}
+
+model authorbook {
+  author_id Int
+  book_id   Int
+  author    author @relation(fields: [author_id], references: [author_id], onDelete: NoAction, onUpdate: NoAction)
+  book      book   @relation(fields: [book_id], references: [book_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([author_id, book_id])
+}
+
+model book {
+  book_id          Int            @id @default(autoincrement())
+  title            String         @db.VarChar(64)
+  publication_year Int?           @db.SmallInt
+  pub_id           Int
+  authorbook       authorbook[]
+  publisher        publisher      @relation(fields: [pub_id], references: [pub_id], onDelete: NoAction, onUpdate: NoAction)
+  bookcategory     bookcategory[]
+  loan             loan[]
+  rewiews          Review[]
+}
+
+model bookcategory {
+  category_id Int
+  book_id     Int
+  book        book     @relation(fields: [book_id], references: [book_id], onDelete: NoAction, onUpdate: NoAction)
+  category    category @relation(fields: [category_id], references: [category_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([category_id, book_id])
+}
+
+model category {
+  category_id   Int            @id @default(autoincrement())
+  category_name String         @db.VarChar(32)
+  bookcategory  bookcategory[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model fine {
+  fine_id Int          @id @default(autoincrement())
+  loan_id Int?         @unique
+  amount  Decimal?     @db.Decimal(6, 2)
+  status  status_fine?
+  loan    loan?        @relation(fields: [loan_id], references: [loan_id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model librarian {
+  librarian_id Int              @id @default(autoincrement())
+  name         String           @db.VarChar(32)
+  surname      String           @db.VarChar(32)
+  position     position_name?
+  department   department_name?
+  email        String           @unique @db.VarChar(32)
+  loan         loan[]
+}
+
+model loan {
+  loan_id      Int          @id @default(autoincrement())
+  member_id    Int
+  book_id      Int
+  librarian_id Int
+  loan_date    DateTime     @db.Date
+  return_date  DateTime?    @db.Date
+  status       status_name?
+  fine         fine?
+  book         book         @relation(fields: [book_id], references: [book_id], onDelete: NoAction, onUpdate: NoAction)
+  librarian    librarian    @relation(fields: [librarian_id], references: [librarian_id], onDelete: NoAction, onUpdate: NoAction)
+  member       member       @relation(fields: [member_id], references: [member_id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model member {
+  member_id         Int      @id @default(autoincrement())
+  name              String   @db.VarChar(32)
+  surname           String   @db.VarChar(32)
+  address           String
+  phone_number      String?  @unique @db.VarChar(13)
+  registration_date DateTime @db.Date
+  loan              loan[]
+  is_active         Boolean  @default(true)  // 5. Додано поле в моделі
+}
+
+model publisher {
+  pub_id  Int    @id @default(autoincrement())
+  name    String @db.VarChar(32)
+  address String
+  book    book[]
+}
+
+enum department_name {
+  ElectronicLibrary @map("Відділ електронної бібліотеки")
+  ReadingRooms @map("Відділ читальних залів")
+  RareBooks @map("Відділ рідкісних і цінних книг")
+}
+
+enum position_name {
+  LeadingLibrarian @map("Провідний бібліотекар")
+  LibrarianCategory1 @map("Бібліотекар І категорії")
+  LibrarianCategory2 @map("Бібліотекар ІІ категорії")
+  Librarian @map("Бібліотекар")
+}
+
+enum status_fine {
+  Accrued @map("Нараховано")
+  Paid @map("Сплачено")
+  WrittenOff @map("Списано")
+}
+
+enum status_name {
+  Issued @map("Видано")
+  Returned @map("Повернено")
+  Overdue @map("Прострочено")
+}
+
+// 4. Нова модель для оцінок/відгуків
+model Review {
+  review_id  Int        @id @default(autoincrement())
+  rating     Int
+  comment    String?    @db.VarChar(512)
+  book       book       @relation(fields: [book_id], references: [book_id])
+  book_id    Int
+  created_at DateTime   @default(now()) @db.Timestamp(3)
+}
